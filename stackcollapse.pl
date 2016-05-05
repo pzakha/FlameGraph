@@ -50,20 +50,45 @@
 
 use strict;
 
-my $headerlines = 3;		# number of input lines to skip
+my $headerlines = 0;		# number of input lines to skip
 my $includeoffset = 0;		# include function offset (except leafs)
 my %collapsed;
+open(my $fh, ">&", STDOUT);
 
 sub remember_stack {
 	my ($stack, $count) = @_;
 	$collapsed{$stack} += $count;
 }
 
+sub output {
+	foreach my $k (sort { $a cmp $b } keys %collapsed) {
+		print $fh "$k $collapsed{$k}\n";
+	}
+}
+
 my $nr = 0;
 my @stack;
 
-foreach (<>) {
+while (<>) {
+
 	next if $nr++ < $headerlines;
+
+	if (/^FILE=(.+)$/) {
+		output();
+		%collapsed = ();
+		close($fh);
+		print($1 . "\n");
+		open($fh, ">", $1) || die "can't open: $!";
+	}
+
+	if (/^CMD=(.+)$/) {
+		output();
+		%collapsed = ();
+		close($fh);
+		print($1 . "\n");
+		open($fh, "|-", $1) || die "can't fork: $!";
+	}
+
 	chomp;
 
 	if (m/^\s*(\d+)+$/) {
@@ -91,6 +116,4 @@ foreach (<>) {
 	unshift @stack, $frame;
 }
 
-foreach my $k (sort { $a cmp $b } keys %collapsed) {
-	print "$k $collapsed{$k}\n";
-}
+output;
